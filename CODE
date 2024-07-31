@@ -1,0 +1,137 @@
+import random
+
+class WumpusWorld:
+    def __init__(self, size=4):
+        self.size = size
+        self.grid = [[' ' for _ in range(size)] for _ in range(size)]
+        self.agent_position = (0, 0)
+        self.wumpus_position = self._random_position(exclude=[(0, 0)])
+        self.pit_positions = [self._random_position(exclude=[(0, 0), self.wumpus_position]) for _ in range(3)]
+        self.gold_position = self._random_position(exclude=[(0, 0), self.wumpus_position] + self.pit_positions)
+        self.arrows = 1
+        self.gold_collected = False
+        self.scream_heard = False
+        self.path = [(0, 0)]
+
+    def _random_position(self, exclude=[]):
+        positions = [(x, y) for x in range(self.size) for y in range(self.size) if (x, y) not in exclude]
+        return random.choice(positions)
+
+    def get_sensors(self):
+        sensors = []
+        x, y = self.agent_position
+
+        if any((abs(x - wx) + abs(y - wy)) == 1 for wx, wy in [self.wumpus_position]):
+            sensors.append('Stench')
+
+        if any((abs(x - px) + abs(y - py)) == 1 for px, py in self.pit_positions):
+            sensors.append('Breeze')
+
+        if self.agent_position == self.gold_position and not self.gold_collected:
+            sensors.append('Glitter')
+
+        if self.scream_heard:
+            sensors.append('Scream')
+
+        return sensors
+
+    def move_agent(self, direction):
+        x, y = self.agent_position
+        if direction == 'up' and x > 0: x -= 1
+        elif direction == 'down' and x < self.size - 1: x += 1
+        elif direction == 'left' and y > 0: y -= 1
+        elif direction == 'right' and y < self.size - 1: y += 1
+        else: return "Move not possible"
+
+        self.agent_position = (x, y)
+        self.path.append((x, y))
+
+        if self.agent_position == self.wumpus_position or self.agent_position in self.pit_positions:
+            return "Agent died!"
+        return "Moved " + direction
+
+    def shoot_arrow(self, direction):
+        if self.arrows > 0:
+            self.arrows -= 1
+            x, y = self.agent_position
+            if direction == 'up':
+                for i in range(x, -1, -1):
+                    if (i, y) == self.wumpus_position:
+                        self.scream_heard = True
+                        return "Arrow shot and Wumpus killed!"
+            elif direction == 'down':
+                for i in range(x, self.size):
+                    if (i, y) == self.wumpus_position:
+                        self.scream_heard = True
+                        return "Arrow shot and Wumpus killed!"
+            elif direction == 'left':
+                for i in range(y, -1, -1):
+                    if (x, i) == self.wumpus_position:
+                        self.scream_heard = True
+                        return "Arrow shot and Wumpus killed!"
+            elif direction == 'right':
+                for i in range(y, self.size):
+                    if (x, i) == self.wumpus_position:
+                        self.scream_heard = True
+                        return "Arrow shot and Wumpus killed!"
+            return "Arrow shot and missed!"
+        return "No arrows left!"
+
+    def grab_gold(self):
+        if self.agent_position == self.gold_position and not self.gold_collected:
+            self.gold_collected = True
+            return "Gold grabbed!"
+        return "No gold here!"
+
+    def get_status(self):
+        sensors = self.get_sensors()
+        status = {
+            'position': self.agent_position,
+            'sensors': sensors,
+            'arrows': self.arrows,
+            'gold_collected': self.gold_collected,
+            'path': self.path
+        }
+        return status
+
+    def trace_back(self):
+        path_back = reversed(self.path[:-1])
+        for position in path_back:
+            print(f"Traced back to {position}")
+
+def main():
+    world = WumpusWorld()
+
+    while True:
+        status = world.get_status()
+        print("Agent position:", status['position'])
+        print("Sensors:", status['sensors'])
+        print("Arrows left:", status['arrows'])
+        print("Gold collected:", status['gold_collected'])
+        print("Path covered:", status['path'])
+        print()
+
+        action = input("Enter action (move up/down/left/right, shoot up/down/left/right, grab): ")
+        if action.startswith('move '):
+            direction = action.split()[1]
+            result = world.move_agent(direction)
+        elif action.startswith('shoot '):
+            direction = action.split()[1]
+            result = world.shoot_arrow(direction)
+        elif action == 'grab':
+            result = world.grab_gold()
+        else:
+            result = "Invalid action!"
+
+        print(result)
+
+        if status['gold_collected']:
+            print("Congratulations! You've collected the gold and won the game!")
+            world.trace_back()
+            break
+        elif result == "Agent died!":
+            print("Game Over! The agent has died.")
+            break
+
+if __name__ == "__main__":
+    main()
